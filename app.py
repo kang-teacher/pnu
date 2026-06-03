@@ -142,40 +142,34 @@ def chatgpt_param():
 
     return jsonify(kakao_text(result_text))
 
+# 6. 날씨 조회 (requests 방식으로 수정 및 가독성 개선)
 @app.route("/weather", methods=["GET", "POST"])
 def ulsan_weather_skill():
     try:
-        context = ssl._create_unverified_context()
         url = "https://search.naver.com/search.naver?query=%EB%B6%80%EC%82%B0%20%EB%82%A0%EC%94%A8"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        
+        r = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(r.text, "html.parser")
 
-        webpage = urllib.request.urlopen(url, context=context)
-        soup = BeautifulSoup(webpage, "html.parser")
-
-        temps = soup.find("div", class_="temperature_text")
+        # 네이버 날씨 HTML 구조 변화에 대응하여 숫자만 깔끔하게 가져오도록 수정
+        temps_div = soup.find("div", class_="temperature_text")
+        temps = temps_div.find("strong").get_text(strip=True) if temps_div and temps_div.find("strong") else None
         summary = soup.find("p", class_="summary")
 
         if temps and summary:
-            result_text = "부산 " + temps.get_text(strip=True) + " " + summary.get_text(strip=True)
+            # 기존 공백 및 '현재 온도' 문구 정제 후 출력
+            clean_temp = temps.replace("현재 온도", "").strip()
+            result_text = f"부산 날씨: {clean_temp} ({summary.get_text(strip=True)})"
         else:
             result_text = "날씨 정보를 가져오지 못했습니다."
 
     except Exception as e:
         result_text = f"날씨 조회 중 오류가 발생했습니다: {str(e)}"
 
-    response = {
-        "version": "2.0",
-        "template": {
-            "outputs": [{
-                "simpleText": {
-                    "text": result_text[:1000]
-                }
-            }]
-        }
-    }
-    return jsonify(response)
-
+    # 기존 공통 텍스트 템플릿 빌더(kakao_text)를 사용하여 중복 코드 제거
+    return jsonify(kakao_text(result_text))
 
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
-
